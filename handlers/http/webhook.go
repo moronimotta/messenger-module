@@ -109,7 +109,7 @@ func (h *WebhookHandler) sendgrid(c *gin.Context) {
 		fmt.Printf("SG-Message-ID: '%s'\n", event.SGMessageID)
 		fmt.Printf("Timestamp: %d\n", event.Timestamp)
 
-				// Get external ID from event
+		// Get external ID from event
 		externalID := event.SMTPId
 		if externalID == "" {
 			externalID = event.SGMessageID
@@ -133,7 +133,7 @@ func (h *WebhookHandler) sendgrid(c *gin.Context) {
 		}
 		// Remove angle brackets if present
 		extractedID = strings.Trim(extractedID, "<>")
-		
+
 		fmt.Printf("🔍 Looking for message:\n")
 		fmt.Printf("   Raw external_id: '%s'\n", externalID)
 		fmt.Printf("   Extracted ID: '%s'\n", extractedID)
