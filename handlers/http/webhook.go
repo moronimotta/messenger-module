@@ -55,17 +55,33 @@ func (h *WebhookHandler) handleGeneric(c *gin.Context, body genericWebhook) {
 		c.JSON(http.StatusNotFound, gin.H{"error": "message not found for external_id"})
 		return
 	}
-	var sentAt *string
+	// Parse timestamp once
+	var timestamp *string
 	if body.Timestamp > 0 {
 		t := time.Unix(body.Timestamp, 0).UTC().Format(time.RFC3339)
-		sentAt = &t
+		timestamp = &t
 	}
+
+	// Set appropriate date field based on status
 	statusIn := entities.MessageStatus{
 		ExternalID:      body.ExternalID,
 		MessageID:       msg.ID,
 		Status:          body.Status,
 		GatewayResponse: body.GatewayResponse,
-		DateSent:        sentAt,
+	}
+
+	// Map status to appropriate date field
+	switch body.Status {
+	case "queued", "sent", "delivered":
+		statusIn.DateSent = timestamp
+	case "read":
+		statusIn.DateOpened = timestamp
+	case "failed", "undelivered", "error":
+		statusIn.DateError = timestamp
+	case "canceled":
+		statusIn.DateCanceled = timestamp
+	case "deferred":
+		statusIn.DateDeferred = timestamp
 	}
 	_, err = h.statUC.Create(c.Request.Context(), statusIn)
 	if err != nil {
@@ -116,7 +132,6 @@ func (h *WebhookHandler) sendgrid(c *gin.Context) {
 		}
 
 		if externalID == "" {
-			fmt.Printf("⚠️  No external ID in SendGrid event\n")
 			continue
 		}
 
@@ -160,18 +175,13 @@ func (h *WebhookHandler) sendgrid(c *gin.Context) {
 		}
 
 		var msg entities.Message
-		var foundWithID string
 		for _, m := range msgs {
-			// Try exact match with extracted ID first
 			if m.ExternalID == extractedID {
 				msg = m
-				foundWithID = "extracted"
 				break
 			}
-			// Try exact match with raw ID
 			if m.ExternalID == externalID {
 				msg = m
-				foundWithID = "raw"
 				break
 			}
 		}
@@ -186,26 +196,39 @@ func (h *WebhookHandler) sendgrid(c *gin.Context) {
 			continue
 		}
 
-		fmt.Printf("✅ Found message %s using %s ID\n", msg.ID, foundWithID)
-
 		gatewayResponse := fmt.Sprintf(
 			"Event=%s, Email=%s, SMTPId=%s, SGMessageID=%s, Reason=%s, Response=%s, Status=%s",
 			event.Event, event.Email, event.SMTPId, event.SGMessageID,
 			event.Reason, event.Response, event.Status,
 		)
 
-		var sentAt *string
+		// Parse timestamp once
+		var timestamp *string
 		if event.Timestamp > 0 {
 			t := time.Unix(event.Timestamp, 0).UTC().Format(time.RFC3339)
-			sentAt = &t
+			timestamp = &t
 		}
 
+		// Set appropriate date field based on status
 		statusIn := entities.MessageStatus{
 			ExternalID:      externalID,
 			MessageID:       msg.ID,
 			Status:          status,
 			GatewayResponse: gatewayResponse,
-			DateSent:        sentAt,
+		}
+
+		// Map status to appropriate date field
+		switch status {
+		case "sent", "delivered":
+			statusIn.DateSent = timestamp
+		case "read":
+			statusIn.DateOpened = timestamp
+		case "error":
+			statusIn.DateError = timestamp
+		case "canceled":
+			statusIn.DateCanceled = timestamp
+		case "deferred":
+			statusIn.DateDeferred = timestamp
 		}
 
 		_, err = h.statUC.Create(c.Request.Context(), statusIn)
