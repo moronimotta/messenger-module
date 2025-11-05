@@ -2,8 +2,10 @@ package handlers
 
 import (
 	"errors"
+	"fmt"
 	"os"
 	"regexp"
+	"strings"
 
 	"messenger-module/entities"
 
@@ -14,12 +16,14 @@ import (
 type TwillioHandler struct {
 	client *twilio.RestClient
 	from   string
+	env    string
 }
 
 func NewTwillioHandler() *TwillioHandler {
 	accountSid := os.Getenv("TWILIO_ACCOUNT_SID")
 	authToken := os.Getenv("TWILIO_AUTH_TOKEN")
-	fromNumber := os.Getenv("TWILIO_FROM_NUMBER")
+	fromNumber := os.Getenv("TWILIO_PHONE_NUMBER")
+	env := os.Getenv("APP_ENV")
 
 	client := twilio.NewRestClientWithParams(twilio.ClientParams{
 		Username: accountSid,
@@ -29,6 +33,7 @@ func NewTwillioHandler() *TwillioHandler {
 	return &TwillioHandler{
 		client: client,
 		from:   fromNumber,
+		env:    env,
 	}
 }
 
@@ -37,18 +42,28 @@ func (h *TwillioHandler) ValidateMessage(input entities.Message) error {
 		return errors.New("recipient phone number is required")
 	}
 
-	// Basic phone number validation using regex
-	phoneRegex := regexp.MustCompile(`^\+[1-9]\d{1,14}$`)
+	if input.Content == "" {
+		return errors.New("message content is required")
+	}
+
+	if len(input.Content) > 1600 {
+		return errors.New("message content exceeds maximum length of 1600 characters")
+	}
+
+	// Enhanced phone number validation (E.164)
+	// Must be + followed by 7 to 15 digits, starting with non-zero country code
+	// Examples: +14155552671 (US), +447911123456 (UK)
+	phoneRegex := regexp.MustCompile(`^\+[1-9]\d{6,14}$`)
 	if !phoneRegex.MatchString(input.Destination) {
-		return errors.New("invalid phone number format. Must be E.164 format (e.g., +1234567890)")
+		return fmt.Errorf(
+			"invalid phone number format: %s. Must be E.164 (e.g., +14155552671 for US, +447911123456 for UK)",
+			input.Destination,
+		)
 	}
 
-	if input.Destination == "" {
-		return errors.New("message body is required")
-	}
-
-	if len(input.Destination) > 1600 {
-		return errors.New("message body exceeds maximum length of 1600 characters")
+	// Prevent sending to self (from == to)
+	if h.from != "" && input.Destination == h.from {
+		return errors.New("destination cannot be the same as the sender number")
 	}
 
 	return nil
@@ -57,12 +72,28 @@ func (h *TwillioHandler) ValidateMessage(input entities.Message) error {
 func (h *TwillioHandler) SendMessage(input entities.Message) (string, error) {
 	input.Type = "sms"
 
-	if err := h.ValidateMessage(input); err != nil {
+	// Choose destination, allow override in development via TWILIO_VIRTUAL_NUMBER
+	dest := input.Destination
+	if h.env == "development" {
+		if v := os.Getenv("TWILIO_VIRTUAL_NUMBER"); strings.TrimSpace(v) != "" {
+			dest = strings.TrimSpace(v)
+		}
+	}
+
+	// Validate with effective destination
+	eff := input
+	eff.Destination = dest
+	if err := h.ValidateMessage(eff); err != nil {
 		return "", err
 	}
 
 	params := &twilioApi.CreateMessageParams{}
-	params.SetTo(input.Destination)
+
+	if base := strings.TrimRight(os.Getenv("WEBHOOK_BASE_URL"), "/"); base != "" {
+		params.SetStatusCallback(fmt.Sprintf("%s/api/v1/webhooks/twilio", base))
+	}
+
+	params.SetTo(dest)
 	params.SetFrom(h.from)
 	params.SetBody(input.Content)
 
@@ -70,6 +101,5 @@ func (h *TwillioHandler) SendMessage(input entities.Message) (string, error) {
 	if err != nil {
 		return "", err
 	}
-
 	return *resp.Sid, nil
 }

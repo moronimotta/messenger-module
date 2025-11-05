@@ -20,7 +20,11 @@ func NewServer() *Server {
 }
 
 func (s *Server) Start(database db.Database, port string) error {
-	// serve static example pages (optional)
+
+	s.app.RedirectFixedPath = true
+	s.app.RedirectTrailingSlash = true
+	s.app.HandleMethodNotAllowed = true
+
 	s.app.Static("/examples", "./examples")
 	// repositories and usecases
 	repo := repositories.NewDBRepository(database)

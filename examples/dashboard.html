@@ -38,6 +38,7 @@
     .badge-sent { background: #dbeafe; color: #1e40af; }
     .badge-delivered { background: #dcfce7; color: #166534; }
     .badge-read { background: #fef3c7; color: #92400e; }
+    .badge-error { background: #fee2e2; color: #991b1b; }
     .badge-email { background: #ede9fe; color: #5b21b6; }
     .badge-sms { background: #fce7f3; color: #9f1239; }
     .badge-ntfy { background: #cffafe; color: #155e75; }
@@ -45,6 +46,7 @@
     .user-info strong { color: #667eea; }
     .form-row { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; }
     @media (max-width: 768px) { .form-row { grid-template-columns: 1fr; } }
+    h3 { color: #555; margin-top: 2rem; margin-bottom: 1rem; font-size: 1.3rem; border-bottom: 1px solid #e0e0e0; padding-bottom: 0.5rem; }
   </style>
 </head>
 <body>
@@ -63,7 +65,19 @@
 
     <!-- Plans Section -->
     <div class="card">
-      <h2>💎 Available Plans</h2>
+      <h2>💎 User Plans Management</h2>
+      <div class="form-row">
+        <div>
+          <label for="planSelect">Select Plan to Assign/Update</label>
+          <select id="planSelect">
+            <option value="">Select a plan...</option>
+          </select>
+        </div>
+        <div style="display: flex; align-items: flex-end;">
+          <button onclick="updateUserPlan()">Update User Plan</button>
+        </div>
+      </div>
+      <h3>Current User Plans</h3>
       <div id="plansContainer" class="grid"></div>
       <p id="planMsg" class="mt"></p>
     </div>
@@ -171,47 +185,83 @@
         const plans = await plansRes.json();
         const allUserPlans = await userPlansRes.json();
         
+        // Populate plan select dropdown
+        const planSelect = document.getElementById('planSelect');
+        planSelect.innerHTML = '<option value="">Select a plan...</option>' + 
+          plans.map(p => `<option value="${p.id}">${p.name} - ${p.price_cents === 0 ? 'Free' : '$' + (p.price_cents / 100).toFixed(2)}</option>`).join('');
+        
         // Filter user plans for current user
         const userPlans = allUserPlans.filter(up => up.user_id === currentUser.id && up.active);
         const userPlanIds = new Set(userPlans.map(up => up.plan_id));
         
         const container = document.getElementById('plansContainer');
-        container.innerHTML = plans.map(plan => {
-          const isActive = userPlanIds.has(plan.id);
-          const price = plan.price_cents === 0 ? 'Free' : `$${(plan.price_cents / 100).toFixed(2)}/month`;
-          const features = plan.name === 'Free' 
-            ? ['Ntfy notifications', 'Basic features', 'Community support']
-            : ['All Free features', 'SendGrid email', 'Twilio SMS', 'Priority support'];
-          
-          return `
-            <div class="plan-card ${isActive ? 'active' : ''}">
-              <div class="plan-name">${plan.name}</div>
-              <div class="plan-price">${price}</div>
-              <ul class="plan-features">
-                ${features.map(f => `<li>${f}</li>`).join('')}
-              </ul>
-              ${isActive 
-                ? '<button disabled style="background: #22c55e;">✅ Active</button>' 
-                : `<button onclick="upgradeToPlan('${plan.id}', '${plan.name}')">Upgrade to ${plan.name}</button>`
-              }
-            </div>
-          `;
-        }).join('');
+        
+        if (userPlans.length === 0) {
+          container.innerHTML = '<p style="color: #999; text-align: center;">No active plans. Select one above to assign.</p>';
+          return;
+        }
+        
+        container.innerHTML = plans
+          .filter(plan => userPlanIds.has(plan.id))
+          .map(plan => {
+            const price = plan.price_cents === 0 ? 'Free' : `$${(plan.price_cents / 100).toFixed(2)}/month`;
+            const features = plan.name === 'Free' 
+              ? ['Ntfy notifications', 'Basic features', 'Community support']
+              : ['All Free features', 'SendGrid email', 'Twilio SMS', 'Priority support'];
+            
+            return `
+              <div class="plan-card active">
+                <div class="plan-name">${plan.name}</div>
+                <div class="plan-price">${price}</div>
+                <ul class="plan-features">
+                  ${features.map(f => `<li>${f}</li>`).join('')}
+                </ul>
+                <button disabled style="background: #22c55e;">✅ Active</button>
+              </div>
+            `;
+          }).join('');
       } catch (err) {
         console.error('Error loading plans:', err);
       }
     }
 
-    async function upgradeToPlan(planId, planName) {
+    async function updateUserPlan() {
       if (!currentUser) {
         alert('Please load user data first');
         return;
       }
 
+      const planId = document.getElementById('planSelect').value;
       const planMsg = document.getElementById('planMsg');
+      
+      if (!planId) {
+        planMsg.className = 'mt error';
+        planMsg.textContent = '❌ Please select a plan';
+        return;
+      }
+
       planMsg.textContent = '';
 
       try {
+        // First, deactivate all existing user plans
+        const userPlansRes = await fetch(`${apiBase}/user-plans/`);
+        const allUserPlans = await userPlansRes.json();
+        const userPlans = allUserPlans.filter(up => up.user_id === currentUser.id);
+        
+        // Deactivate all existing plans for this user
+        for (const up of userPlans) {
+          await fetch(`${apiBase}/user-plans/${up.id}`, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              user_id: currentUser.id,
+              plan_id: up.plan_id,
+              active: false
+            })
+          });
+        }
+
+        // Create or activate new plan
         const res = await fetch(`${apiBase}/user-plans/`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -222,10 +272,10 @@
           })
         });
 
-        if (!res.ok) throw new Error('Failed to upgrade plan');
+        if (!res.ok) throw new Error('Failed to update plan');
         
         planMsg.className = 'mt success';
-        planMsg.textContent = `✅ Successfully upgraded to ${planName}!`;
+        planMsg.textContent = `✅ User plan updated successfully!`;
         
         // Reload plans to show updated state
         await loadPlans();
@@ -326,13 +376,48 @@
         // Filter messages for current user
         const messages = allMessages.filter(m => m.user_id === currentUser.id);
         
-        // Create status map
+        console.log('Total messages:', allMessages.length);
+        console.log('User messages:', messages.length);
+        console.log('Total statuses:', allStatuses.length);
+        
+        
+        const statusPriority = {
+          'error': 4,
+          'failed': 4,
+          'undelivered': 4,
+          'delivered': 3,
+          'read': 3,
+          'opened': 3,
+          'sent': 2,
+          'queued': 1
+        };
+        
         const statusMap = {};
         allStatuses.forEach(s => {
-          if (!statusMap[s.message_id]) {
+          const existing = statusMap[s.message_id];
+          
+          if (!existing) {
+            // No status yet, use this one
             statusMap[s.message_id] = s;
+            console.log(`Message ${s.message_id.substring(0,8)}: initial status = "${s.status}"`);
+          } else {
+            // Compare timestamps and priority
+            const existingTime = new Date(existing.created_at).getTime();
+            const newTime = new Date(s.created_at).getTime();
+            const existingPriority = statusPriority[existing.status] || 0;
+            const newPriority = statusPriority[s.status] || 0;
+            
+            // If newer timestamp, or same timestamp but higher priority, replace
+            if (newTime > existingTime || (newTime === existingTime && newPriority > existingPriority)) {
+              console.log(`Message ${s.message_id.substring(0,8)}: updating from "${existing.status}" to "${s.status}" (time: ${newTime > existingTime ? 'newer' : 'same'}, priority: ${newPriority} vs ${existingPriority})`);
+              statusMap[s.message_id] = s;
+            } else {
+              console.log(`Message ${s.message_id.substring(0,8)}: keeping "${existing.status}", ignoring "${s.status}"`);
+            }
           }
         });
+        
+        console.log('Final status map:', statusMap);
         
         const tbody = document.getElementById('messagesBody');
         
@@ -343,9 +428,39 @@
         
         tbody.innerHTML = messages.map(msg => {
           const status = statusMap[msg.id];
-          const statusBadge = status 
-            ? `<span class="badge badge-${status.status}">${status.status}</span>` 
-            : '<span class="badge">pending</span>';
+          console.log(`Rendering message ${msg.id.substring(0,8)}...: destination=${msg.destination}`);
+          console.log(`  Status object:`, status);
+          
+          // Determine status badge class and text
+          let statusClass = 'sent';
+          let statusText = 'pending';
+          
+          if (status) {
+            statusText = status.status;
+            console.log(`  -> Actual status: "${statusText}"`);
+            
+            // Map status to badge class
+            if (status.status === 'delivered') {
+              statusClass = 'delivered';
+              console.log('    -> Mapped to: delivered (green)');
+            } else if (status.status === 'read' || status.status === 'opened') {
+              statusClass = 'read';
+              console.log('    -> Mapped to: read (yellow)');
+            } else if (status.status === 'failed' || status.status === 'undelivered' || status.status === 'error') {
+              statusClass = 'error';
+              console.log('    -> Mapped to: error (red)');
+            } else if (status.status === 'sent') {
+              statusClass = 'sent';
+              console.log('    -> Mapped to: sent (blue)');
+            } else {
+              statusClass = 'sent';
+              console.log('    -> Mapped to: sent (default/unknown)');
+            }
+          } else {
+            console.log('  -> No status found, using pending');
+          }
+          
+          const statusBadge = `<span class="badge badge-${statusClass}">${statusText}</span>`;
           
           const typeBadge = `<span class="badge badge-${msg.type}">${msg.type}</span>`;
           const date = new Date(msg.created_at).toLocaleString();

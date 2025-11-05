@@ -1,6 +1,7 @@
 package httphdl
 
 import (
+	"fmt"
 	"net/http"
 	"time"
 
@@ -83,15 +84,51 @@ func (h *WebhookHandler) sendgrid(c *gin.Context) {
 }
 
 func (h *WebhookHandler) twilio(c *gin.Context) {
-	// Twilio often posts form-encoded; support both
-	if c.ContentType() == "application/x-www-form-urlencoded" {
+	// Twilio posts form-encoded by default
+	if c.ContentType() == "application/x-www-form-urlencoded" || c.Request.Method == "POST" {
+		// Parse form data first
+		if err := c.Request.ParseForm(); err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "failed to parse form"})
+			return
+		}
+
+		messageSid := c.PostForm("MessageSid")
+		messageStatus := c.PostForm("MessageStatus")
+
+		if messageSid == "" || messageStatus == "" {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "MessageSid and MessageStatus are required"})
+			return
+		}
+
+		// Build comprehensive gateway response from all Twilio fields
+		gatewayResponse := fmt.Sprintf(
+			"MessageSid=%s, AccountSid=%s, MessagingServiceSid=%s, From=%s, To=%s, Body=%s, Status=%s, ErrorCode=%s, ErrorMessage=%s, DateCreated=%s, DateSent=%s, DateUpdated=%s",
+			c.PostForm("MessageSid"),
+			c.PostForm("AccountSid"),
+			c.PostForm("MessagingServiceSid"),
+			c.PostForm("From"),
+			c.PostForm("To"),
+			c.PostForm("Body"),
+			c.PostForm("MessageStatus"),
+			c.PostForm("ErrorCode"),
+			c.PostForm("ErrorMessage"),
+			c.PostForm("DateCreated"),
+			c.PostForm("DateSent"),
+			c.PostForm("DateUpdated"),
+		)
+
+		fmt.Printf("Twilio webhook received: %s\n", gatewayResponse)
+
 		body := genericWebhook{
-			ExternalID: c.PostForm("MessageSid"),
-			Status:     c.PostForm("MessageStatus"),
+			ExternalID:      messageSid,
+			Status:          messageStatus,
+			GatewayResponse: gatewayResponse,
 		}
 		h.handleGeneric(c, body)
 		return
 	}
+
+	// Fallback to JSON if not form-encoded
 	var body genericWebhook
 	if err := c.ShouldBindJSON(&body); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
