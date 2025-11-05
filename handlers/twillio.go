@@ -55,6 +55,8 @@ func (h *TwillioHandler) ValidateMessage(input entities.Message) error {
 }
 
 func (h *TwillioHandler) SendMessage(input entities.Message) (string, error) {
+	input.Type = "sms"
+
 	if err := h.ValidateMessage(input); err != nil {
 		return "", err
 	}

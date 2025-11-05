@@ -1,0 +1,372 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Messenger Module - Dashboard</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: system-ui, -apple-system, sans-serif; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); min-height: 100vh; padding: 2rem; }
+    .container { max-width: 1400px; margin: 0 auto; }
+    h1 { color: white; text-align: center; margin-bottom: 2rem; font-size: 2.5rem; }
+    .card { background: white; border-radius: 12px; padding: 2rem; margin-bottom: 1.5rem; box-shadow: 0 10px 30px rgba(0,0,0,0.2); }
+    .card h2 { color: #333; margin-bottom: 1rem; border-bottom: 2px solid #667eea; padding-bottom: 0.5rem; }
+    .card h3 { color: #555; margin-top: 1.5rem; margin-bottom: 1rem; font-size: 1.2rem; }
+    label { display: block; margin-top: 1rem; margin-bottom: 0.5rem; font-weight: 600; color: #555; }
+    input, select, textarea { width: 100%; padding: 0.75rem; border: 2px solid #e0e0e0; border-radius: 8px; font-size: 1rem; transition: all 0.3s; }
+    input:focus, select:focus, textarea:focus { outline: none; border-color: #667eea; box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1); }
+    button { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; padding: 0.75rem 1.5rem; border: none; border-radius: 8px; cursor: pointer; font-size: 1rem; font-weight: 600; margin-top: 1rem; margin-right: 0.5rem; transition: transform 0.2s; }
+    button:hover { transform: translateY(-2px); box-shadow: 0 5px 15px rgba(102, 126, 234, 0.3); }
+    button:disabled { opacity: 0.6; cursor: not-allowed; transform: none; }
+    .success { color: #22c55e; font-weight: 600; margin-top: 1rem; }
+    .error { color: #ef4444; font-weight: 600; margin-top: 1rem; }
+    .mt { margin-top: 1rem; }
+    .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 1.5rem; }
+    .plan-card { border: 2px solid #e0e0e0; padding: 1.5rem; border-radius: 8px; transition: all 0.3s; }
+    .plan-card:hover { border-color: #667eea; box-shadow: 0 5px 15px rgba(102, 126, 234, 0.2); }
+    .plan-card.active { border-color: #22c55e; background: #f0fdf4; }
+    .plan-name { font-size: 1.5rem; font-weight: bold; color: #333; margin-bottom: 0.5rem; }
+    .plan-price { font-size: 1.2rem; color: #667eea; margin-bottom: 1rem; }
+    .plan-features { list-style: none; margin-bottom: 1rem; }
+    .plan-features li { padding: 0.5rem 0; color: #666; }
+    .plan-features li:before { content: "✓ "; color: #22c55e; font-weight: bold; }
+    table { width: 100%; border-collapse: collapse; margin-top: 1rem; }
+    th, td { padding: 0.75rem; text-align: left; border-bottom: 1px solid #e0e0e0; }
+    th { background: #f8f9fa; font-weight: 600; color: #555; }
+    tr:hover { background: #f8f9fa; }
+    .badge { display: inline-block; padding: 0.25rem 0.75rem; border-radius: 12px; font-size: 0.875rem; font-weight: 600; }
+    .badge-sent { background: #dbeafe; color: #1e40af; }
+    .badge-delivered { background: #dcfce7; color: #166534; }
+    .badge-read { background: #fef3c7; color: #92400e; }
+    .badge-email { background: #ede9fe; color: #5b21b6; }
+    .badge-sms { background: #fce7f3; color: #9f1239; }
+    .badge-ntfy { background: #cffafe; color: #155e75; }
+    .user-info { background: #f8f9fa; padding: 1rem; border-radius: 8px; margin-bottom: 1rem; }
+    .user-info strong { color: #667eea; }
+    .form-row { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; }
+    @media (max-width: 768px) { .form-row { grid-template-columns: 1fr; } }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>📨 Messenger Module Dashboard</h1>
+
+    <!-- User ID Input Section -->
+    <div class="card">
+      <h2>👤 User Session</h2>
+      <label for="userId">User ID</label>
+      <input id="userId" type="text" placeholder="Enter your user ID" />
+      <button id="loadUserBtn" onclick="loadUserData()">Load User Data</button>
+      <div id="userInfo" class="user-info mt" style="display: none;"></div>
+      <p id="userMsg" class="mt"></p>
+    </div>
+
+    <!-- Plans Section -->
+    <div class="card">
+      <h2>💎 Available Plans</h2>
+      <div id="plansContainer" class="grid"></div>
+      <p id="planMsg" class="mt"></p>
+    </div>
+
+    <!-- Send Message Section -->
+    <div class="card">
+      <h2>📤 Send Message</h2>
+      <div class="form-row">
+        <div>
+          <label for="integrationId">Integration</label>
+          <select id="integrationId">
+            <option value="">Select integration...</option>
+          </select>
+        </div>
+        <div>
+          <label for="destination">Destination</label>
+          <input id="destination" type="text" placeholder="Email, phone, or topic" />
+        </div>
+      </div>
+      <label for="content">Message Content</label>
+      <textarea id="content" rows="4" placeholder="Your message here..."></textarea>
+      <label for="subject">Subject (optional, for email)</label>
+      <input id="subject" type="text" placeholder="Email subject" />
+      <button id="sendBtn" onclick="sendMessage()">Send Message</button>
+      <p id="sendMsg" class="mt"></p>
+    </div>
+
+    <!-- Messages Table -->
+    <div class="card">
+      <h2>📬 Your Messages</h2>
+      <button onclick="loadMessages()">Refresh Messages</button>
+      <div style="overflow-x: auto;">
+        <table id="messagesTable">
+          <thead>
+            <tr>
+              <th>Type</th>
+              <th>Destination</th>
+              <th>Content</th>
+              <th>Status</th>
+              <th>Created</th>
+            </tr>
+          </thead>
+          <tbody id="messagesBody">
+            <tr><td colspan="5" style="text-align: center; padding: 2rem; color: #999;">Load user data to see messages</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    const apiBase = '/api/v1';
+    let currentUser = null;
+
+    async function loadUserData() {
+      const userId = document.getElementById('userId').value.trim();
+      const userMsg = document.getElementById('userMsg');
+      const loadBtn = document.getElementById('loadUserBtn');
+      
+      if (!userId) {
+        userMsg.className = 'mt error';
+        userMsg.textContent = 'Please enter a user ID';
+        return;
+      }
+
+      loadBtn.disabled = true;
+      userMsg.textContent = '';
+
+      try {
+        const res = await fetch(`${apiBase}/users/${userId}`);
+        if (!res.ok) throw new Error('User not found');
+        
+        const user = await res.json();
+        currentUser = user;
+        
+        document.getElementById('userInfo').innerHTML = `
+          <strong>Name:</strong> ${user.name}<br>
+          <strong>API Key:</strong> ${user.api_key}<br>
+          <strong>Active:</strong> ${user.active ? '✅ Yes' : '❌ No'}
+        `;
+        document.getElementById('userInfo').style.display = 'block';
+        
+        userMsg.className = 'mt success';
+        userMsg.textContent = '✅ User loaded successfully!';
+        
+        // Load user's data
+        await loadPlans();
+        await loadIntegrations();
+        await loadMessages();
+      } catch (err) {
+        userMsg.className = 'mt error';
+        userMsg.textContent = '❌ ' + err.message;
+      } finally {
+        loadBtn.disabled = false;
+      }
+    }
+
+    async function loadPlans() {
+      try {
+        const [plansRes, userPlansRes] = await Promise.all([
+          fetch(`${apiBase}/plans/`),
+          fetch(`${apiBase}/user-plans/`)
+        ]);
+        
+        const plans = await plansRes.json();
+        const allUserPlans = await userPlansRes.json();
+        
+        // Filter user plans for current user
+        const userPlans = allUserPlans.filter(up => up.user_id === currentUser.id && up.active);
+        const userPlanIds = new Set(userPlans.map(up => up.plan_id));
+        
+        const container = document.getElementById('plansContainer');
+        container.innerHTML = plans.map(plan => {
+          const isActive = userPlanIds.has(plan.id);
+          const price = plan.price_cents === 0 ? 'Free' : `$${(plan.price_cents / 100).toFixed(2)}/month`;
+          const features = plan.name === 'Free' 
+            ? ['Ntfy notifications', 'Basic features', 'Community support']
+            : ['All Free features', 'SendGrid email', 'Twilio SMS', 'Priority support'];
+          
+          return `
+            <div class="plan-card ${isActive ? 'active' : ''}">
+              <div class="plan-name">${plan.name}</div>
+              <div class="plan-price">${price}</div>
+              <ul class="plan-features">
+                ${features.map(f => `<li>${f}</li>`).join('')}
+              </ul>
+              ${isActive 
+                ? '<button disabled style="background: #22c55e;">✅ Active</button>' 
+                : `<button onclick="upgradeToPlan('${plan.id}', '${plan.name}')">Upgrade to ${plan.name}</button>`
+              }
+            </div>
+          `;
+        }).join('');
+      } catch (err) {
+        console.error('Error loading plans:', err);
+      }
+    }
+
+    async function upgradeToPlan(planId, planName) {
+      if (!currentUser) {
+        alert('Please load user data first');
+        return;
+      }
+
+      const planMsg = document.getElementById('planMsg');
+      planMsg.textContent = '';
+
+      try {
+        const res = await fetch(`${apiBase}/user-plans/`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            user_id: currentUser.id,
+            plan_id: planId,
+            active: true
+          })
+        });
+
+        if (!res.ok) throw new Error('Failed to upgrade plan');
+        
+        planMsg.className = 'mt success';
+        planMsg.textContent = `✅ Successfully upgraded to ${planName}!`;
+        
+        // Reload plans to show updated state
+        await loadPlans();
+        await loadIntegrations();
+      } catch (err) {
+        planMsg.className = 'mt error';
+        planMsg.textContent = '❌ ' + err.message;
+      }
+    }
+
+    async function loadIntegrations() {
+      try {
+        const res = await fetch(`${apiBase}/integrations/`);
+        const integrations = await res.json();
+        
+        const select = document.getElementById('integrationId');
+        select.innerHTML = '<option value="">Select integration...</option>' + 
+          integrations.map(i => 
+            `<option value="${i.id}">${i.name} (${i.type})</option>`
+          ).join('');
+      } catch (err) {
+        console.error('Error loading integrations:', err);
+      }
+    }
+
+    async function sendMessage() {
+      if (!currentUser) {
+        alert('Please load user data first');
+        return;
+      }
+
+      const integrationId = document.getElementById('integrationId').value;
+      const destination = document.getElementById('destination').value.trim();
+      const content = document.getElementById('content').value.trim();
+      const subject = document.getElementById('subject').value.trim();
+      const sendMsg = document.getElementById('sendMsg');
+      const sendBtn = document.getElementById('sendBtn');
+
+      if (!integrationId || !destination || !content) {
+        sendMsg.className = 'mt error';
+        sendMsg.textContent = '❌ Please fill in all required fields';
+        return;
+      }
+
+      sendBtn.disabled = true;
+      sendMsg.textContent = '';
+
+      try {
+        const payload = {
+          user_id: currentUser.id,
+          integration_id: integrationId,
+          destination,
+          content
+        };
+        
+        if (subject) payload.subject = subject;
+
+        const res = await fetch(`${apiBase}/messages/`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload)
+        });
+
+        const data = await res.json();
+        
+        if (!res.ok) throw new Error(data.error || 'Failed to send message');
+        
+        sendMsg.className = 'mt success';
+        sendMsg.textContent = '✅ Message sent successfully!';
+        
+        // Clear form
+        document.getElementById('destination').value = '';
+        document.getElementById('content').value = '';
+        document.getElementById('subject').value = '';
+        
+        // Reload messages
+        await loadMessages();
+      } catch (err) {
+        sendMsg.className = 'mt error';
+        sendMsg.textContent = '❌ ' + err.message;
+      } finally {
+        sendBtn.disabled = false;
+      }
+    }
+
+    async function loadMessages() {
+      if (!currentUser) return;
+
+      try {
+        const [messagesRes, statusesRes] = await Promise.all([
+          fetch(`${apiBase}/messages/`),
+          fetch(`${apiBase}/message-statuses/`)
+        ]);
+        
+        const allMessages = await messagesRes.json();
+        const allStatuses = await statusesRes.json();
+        
+        // Filter messages for current user
+        const messages = allMessages.filter(m => m.user_id === currentUser.id);
+        
+        // Create status map
+        const statusMap = {};
+        allStatuses.forEach(s => {
+          if (!statusMap[s.message_id]) {
+            statusMap[s.message_id] = s;
+          }
+        });
+        
+        const tbody = document.getElementById('messagesBody');
+        
+        if (messages.length === 0) {
+          tbody.innerHTML = '<tr><td colspan="5" style="text-align: center; padding: 2rem; color: #999;">No messages yet</td></tr>';
+          return;
+        }
+        
+        tbody.innerHTML = messages.map(msg => {
+          const status = statusMap[msg.id];
+          const statusBadge = status 
+            ? `<span class="badge badge-${status.status}">${status.status}</span>` 
+            : '<span class="badge">pending</span>';
+          
+          const typeBadge = `<span class="badge badge-${msg.type}">${msg.type}</span>`;
+          const date = new Date(msg.created_at).toLocaleString();
+          const truncatedContent = msg.content.length > 50 
+            ? msg.content.substring(0, 50) + '...' 
+            : msg.content;
+          
+          return `
+            <tr>
+              <td>${typeBadge}</td>
+              <td>${msg.destination}</td>
+              <td>${truncatedContent}</td>
+              <td>${statusBadge}</td>
+              <td>${date}</td>
+            </tr>
+          `;
+        }).join('');
+      } catch (err) {
+        console.error('Error loading messages:', err);
+      }
+    }
+  </script>
+</body>
+</html>

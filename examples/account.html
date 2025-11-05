@@ -1,0 +1,96 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Messenger Module - Create User</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: system-ui, -apple-system, sans-serif; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); min-height: 100vh; padding: 2rem; }
+    .container { max-width: 600px; margin: 0 auto; }
+    h1 { color: white; text-align: center; margin-bottom: 2rem; font-size: 2.2rem; }
+    .card { background: white; border-radius: 12px; padding: 2rem; box-shadow: 0 10px 30px rgba(0,0,0,0.2); }
+    .card h2 { color: #333; margin-bottom: 1rem; border-bottom: 2px solid #667eea; padding-bottom: 0.5rem; }
+    label { display: block; margin-top: 1rem; margin-bottom: 0.5rem; font-weight: 600; color: #555; }
+    input { width: 100%; padding: 0.75rem; border: 2px solid #e0e0e0; border-radius: 8px; font-size: 1rem; transition: all 0.3s; }
+    input:focus { outline: none; border-color: #667eea; box-shadow: 0 0 0 3px rgba(102,126,234,0.1); }
+    button { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; padding: 0.75rem 1.5rem; border: none; border-radius: 8px; cursor: pointer; font-size: 1rem; font-weight: 600; margin-top: 1.5rem; width: 100%; transition: transform 0.2s; }
+    button:hover { transform: translateY(-2px); box-shadow: 0 5px 15px rgba(102,126,234,0.3); }
+    button:disabled { opacity: 0.6; cursor: not-allowed; transform: none; }
+    .success { color: #22c55e; font-weight: 600; margin-top: 1rem; }
+    .error { color: #ef4444; font-weight: 600; margin-top: 1rem; }
+    .output { background: #f8f9fa; border-radius: 8px; padding: 1rem; margin-top: 1rem; border: 1px solid #e5e7eb; }
+    .output strong { color: #667eea; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>👤 Create New User</h1>
+
+    <div class="card">
+      <h2>Account Details</h2>
+
+      <label for="name">Name</label>
+      <input id="name" type="text" placeholder="Enter full name" />
+
+      <label for="email">Email</label>
+      <input id="email" type="email" placeholder="Enter email address" />
+
+      <button id="createBtn">Create User</button>
+
+      <p id="msg" class="mt"></p>
+
+      <div id="output" class="output" style="display: none;">
+        <p><strong>User ID:</strong> <span id="userId"></span></p>
+        <p><strong>API Key:</strong> <span id="apiKey"></span></p>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    const apiBase = '/api/v1';
+    const btn = document.getElementById('createBtn');
+    const msg = document.getElementById('msg');
+    const output = document.getElementById('output');
+
+    btn.addEventListener('click', async () => {
+      const name = document.getElementById('name').value.trim();
+      const email = document.getElementById('email').value.trim();
+
+      msg.textContent = '';
+      output.style.display = 'none';
+
+      if (!name || !email) {
+        msg.className = 'error';
+        msg.textContent = '❌ Please fill in all fields';
+        return;
+      }
+
+      btn.disabled = true;
+
+      try {
+        const res = await fetch(`${apiBase}/users/`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ name, email })
+        });
+
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error || 'Failed to create user');
+
+        msg.className = 'success';
+        msg.textContent = '✅ User created successfully!';
+
+        document.getElementById('userId').textContent = data.id || '(missing id)';
+        document.getElementById('apiKey').textContent = data.api_key || '(missing key)';
+        output.style.display = 'block';
+      } catch (err) {
+        msg.className = 'error';
+        msg.textContent = '❌ ' + err.message;
+      } finally {
+        btn.disabled = false;
+      }
+    });
+  </script>
+</body>
+</html>

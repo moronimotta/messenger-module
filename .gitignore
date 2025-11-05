@@ -1,0 +1,14 @@
+# Environment and secrets
+.env
+
+# Docker
+docker-compose.yml
+
+# Build artifacts
+messenger-module
+
+# Examples (if you don't want to track them)
+# examples/
+
+# README (if you don't want to track it)
+# README.md

@@ -1,7 +1,9 @@
 package server
 
 import (
+	"log"
 	"messenger-module/db"
+	"messenger-module/handlers"
 	httphdl "messenger-module/handlers/http"
 	"messenger-module/repositories"
 	"messenger-module/usecases"
@@ -18,6 +20,8 @@ func NewServer() *Server {
 }
 
 func (s *Server) Start(database db.Database, port string) error {
+	// serve static example pages (optional)
+	s.app.Static("/examples", "./examples")
 	// repositories and usecases
 	repo := repositories.NewDBRepository(database)
 	userUC := usecases.NewUserUsecase(repo)
@@ -31,7 +35,7 @@ func (s *Server) Start(database db.Database, port string) error {
 	api := s.app.Group("/api/v1")
 
 	users := api.Group("/users/")
-	httphdl.NewUserHandler(userUC).Register(users)
+	httphdl.NewUserHandler(userUC, planUC, userPlanUC).Register(users)
 
 	plans := api.Group("/plans/")
 	httphdl.NewPlanHandler(planUC).Register(plans)
@@ -47,6 +51,18 @@ func (s *Server) Start(database db.Database, port string) error {
 
 	statuses := api.Group("/message-statuses/")
 	httphdl.NewMessageStatusHandler(messageStatusUC).Register(statuses)
+
+	// webhooks
+	webhooks := api.Group("/webhooks/")
+	httphdl.NewWebhookHandler(messageUC, messageStatusUC).Register(webhooks)
+
+	// emails via SendGrid
+	if sg, err := handlers.NewSendGridHandler(); err != nil {
+		log.Printf("sendgrid disabled: %v", err)
+	} else {
+		emails := api.Group("/emails/")
+		httphdl.NewSendGridHTTPHandler(sg).Register(emails)
+	}
 
 	return s.app.Run(":" + port)
 }

@@ -6,6 +6,8 @@ import (
 	"strings"
 
 	"messenger-module/entities"
+
+	"github.com/google/uuid"
 )
 
 type UserUsecase struct {
@@ -19,8 +21,8 @@ func (u *UserUsecase) Create(ctx context.Context, in entities.User) (entities.Us
 	if in.Name == "" {
 		return entities.User{}, errors.New("name is required")
 	}
-	if in.APIKey == "" {
-		return entities.User{}, errors.New("api_key is required")
+	if strings.TrimSpace(in.APIKey) == "" {
+		in.APIKey = uuid.New().String()
 	}
 	return u.repo.CreateUser(ctx, in)
 }

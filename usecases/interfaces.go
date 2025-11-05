@@ -5,10 +5,6 @@ import (
 	"messenger-module/entities"
 )
 
-// Repository abstracts data access for usecases
-// It is implemented by repositories.DBRepository
-// Split by entity for clarity
-
 type UserRepo interface {
 	CreateUser(ctx context.Context, in entities.User) (entities.User, error)
 	GetUser(ctx context.Context, id string) (entities.User, error)

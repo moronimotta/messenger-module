@@ -1,0 +1,108 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Messenger Module - Login / Create User</title>
+  <style>
+    body { font-family: system-ui, -apple-system, Segoe UI, Roboto, Ubuntu, Cantarell, 'Helvetica Neue', Arial, 'Noto Sans', 'Apple Color Emoji', 'Segoe UI Emoji', 'Segoe UI Symbol'; margin: 2rem; }
+    .card { max-width: 560px; padding: 1.5rem; border: 1px solid #e5e7eb; border-radius: 8px; box-shadow: 0 1px 2px rgba(0,0,0,0.04); }
+    label { display: block; margin: .5rem 0 .25rem; font-weight: 600; }
+    input { width: 100%; padding: .6rem .7rem; border: 1px solid #d1d5db; border-radius: 6px; }
+    button { margin-top: 1rem; background: #111827; color: #fff; border: 0; border-radius: 6px; padding: .6rem 1rem; cursor: pointer; }
+    button:disabled { opacity: .6; cursor: not-allowed; }
+    .row { display: grid; gap: 1rem; grid-template-columns: 1fr; }
+    .mt { margin-top: 1rem; }
+    .success { color: #065f46; }
+    .error { color: #991b1b; }
+    .hint { color: #6b7280; font-size: .9rem; }
+  </style>
+</head>
+<body>
+  <h1>Messenger Module</h1>
+  <p class="hint">This lightweight page lets you create a user (auto-assigned the Free plan) or log in with an existing API key.</p>
+  <p class="hint">Or skip to the <a href="./dashboard.html" style="color: #2563eb; text-decoration: underline;">Dashboard</a> to test features without authentication.</p>
+
+  <div class="row">
+    <div class="card">
+      <h2>Create user</h2>
+      <form id="createForm">
+        <label for="name">Name</label>
+        <input id="name" name="name" placeholder="Jane Developer" required />
+        <label for="apiKey">API Key</label>
+        <input id="apiKey" name="apiKey" placeholder="my-secret-key" required />
+        <button id="createBtn" type="submit">Create</button>
+      </form>
+      <p id="createMsg" class="mt"></p>
+    </div>
+
+    <div class="card">
+      <h2>Login (by API Key)</h2>
+      <form id="loginForm">
+        <label for="loginApiKey">API Key</label>
+        <input id="loginApiKey" name="loginApiKey" placeholder="my-secret-key" required />
+        <button id="loginBtn" type="submit">Login</button>
+      </form>
+      <p id="loginMsg" class="mt"></p>
+    </div>
+  </div>
+
+  <script>
+    const apiBase = '/api/v1';
+
+    const createForm = document.getElementById('createForm');
+    const createBtn  = document.getElementById('createBtn');
+    const createMsg  = document.getElementById('createMsg');
+
+    createForm.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      createBtn.disabled = true;
+      createMsg.textContent = '';
+
+      const payload = {
+        name: document.getElementById('name').value.trim(),
+        api_key: document.getElementById('apiKey').value.trim(),
+      };
+
+      try {
+        const res = await fetch(`${apiBase}/users/`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload)
+        });
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok) throw new Error(data.error || `HTTP ${res.status}`);
+        createMsg.className = 'mt success';
+        createMsg.textContent = `User created with id ${data.id}. Assigned to Free plan.`;
+        // Stash minimal session in localStorage
+        localStorage.setItem('userId', data.id);
+        localStorage.setItem('apiKey', data.api_key);
+        // Navigate to account page
+        window.location.href = './account.html';
+      } catch (err) {
+        createMsg.className = 'mt error';
+        createMsg.textContent = String(err.message || err);
+      } finally {
+        createBtn.disabled = false;
+      }
+    });
+
+    const loginForm = document.getElementById('loginForm');
+    const loginBtn  = document.getElementById('loginBtn');
+    const loginMsg  = document.getElementById('loginMsg');
+
+    loginForm.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      loginBtn.disabled = true;
+      loginMsg.textContent = '';
+
+      const apiKey = document.getElementById('loginApiKey').value.trim();
+      if (!apiKey) { loginBtn.disabled = false; return; }
+      localStorage.setItem('apiKey', apiKey);
+      loginMsg.className = 'mt success';
+      loginMsg.textContent = 'Logged in locally. Proceeding to account…';
+      window.location.href = './account.html';
+    });
+  </script>
+</body>
+</html>

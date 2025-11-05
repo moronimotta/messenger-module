@@ -23,10 +23,11 @@ func (h *NtfyHandler) ValidateMessage(input entities.Message) error {
 }
 
 func (h *NtfyHandler) SendMessage(input entities.Message) (string, error) {
+	input.Type = "ntfy"
+
 	if err := h.ValidateMessage(input); err != nil {
 		return "", err
 	}
-	// Fire-and-forget demo implementation
 	httpClient := &nethttp.Client{}
 	req, err := nethttp.NewRequest("POST", "https://ntfy.sh/"+input.Destination, strings.NewReader(input.Content))
 	if err != nil {
@@ -37,5 +38,5 @@ func (h *NtfyHandler) SendMessage(input entities.Message) (string, error) {
 		return "", err
 	}
 	defer resp.Body.Close()
-	return "ntfy-message-id", nil
+	return "", nil
 }
