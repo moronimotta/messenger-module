@@ -120,10 +120,6 @@ func (h *WebhookHandler) sendgrid(c *gin.Context) {
 			continue
 		}
 
-		// Try to extract just the message ID part (SendGrid may prefix with extra data)
-		// Format can be like "<TBSQO9UpQ2Cl_s8PtRwPmA@smtp.sendgrid.net>"
-		// or "<TBSQO9UpQ2Cl_s8PtRwPmA.filter0001p1mdw1.12345.67890ABCDEF@sendgrid.net>"
-		// We need the base64-like part before any @ or .
 		extractedID := externalID
 		if idx := strings.Index(externalID, "@"); idx != -1 {
 			extractedID = externalID[0:idx]
@@ -181,11 +177,6 @@ func (h *WebhookHandler) sendgrid(c *gin.Context) {
 		}
 
 		if msg.ID == "" {
-			fmt.Printf("❌ Message not found in %d messages:\n", len(msgs))
-			fmt.Printf("   Extracted ID: '%s'\n", extractedID)
-			fmt.Printf("   Raw ID: '%s'\n", externalID)
-			// Show first few messages to debug
-			fmt.Printf("   Sample message external_ids from database:\n")
 			for i, m := range msgs {
 				if i >= 3 {
 					break
@@ -197,7 +188,6 @@ func (h *WebhookHandler) sendgrid(c *gin.Context) {
 
 		fmt.Printf("✅ Found message %s using %s ID\n", msg.ID, foundWithID)
 
-		// Build gateway response
 		gatewayResponse := fmt.Sprintf(
 			"Event=%s, Email=%s, SMTPId=%s, SGMessageID=%s, Reason=%s, Response=%s, Status=%s",
 			event.Event, event.Email, event.SMTPId, event.SGMessageID,
@@ -247,7 +237,6 @@ func (h *WebhookHandler) twilio(c *gin.Context) {
 			return
 		}
 
-		// Build comprehensive gateway response from all Twilio fields
 		gatewayResponse := fmt.Sprintf(
 			"MessageSid=%s, AccountSid=%s, MessagingServiceSid=%s, From=%s, To=%s, Body=%s, Status=%s, ErrorCode=%s, ErrorMessage=%s, DateCreated=%s, DateSent=%s, DateUpdated=%s",
 			c.PostForm("MessageSid"),

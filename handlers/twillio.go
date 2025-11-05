@@ -50,9 +50,6 @@ func (h *TwillioHandler) ValidateMessage(input entities.Message) error {
 		return errors.New("message content exceeds maximum length of 1600 characters")
 	}
 
-	// Enhanced phone number validation (E.164)
-	// Must be + followed by 7 to 15 digits, starting with non-zero country code
-	// Examples: +14155552671 (US), +447911123456 (UK)
 	phoneRegex := regexp.MustCompile(`^\+[1-9]\d{6,14}$`)
 	if !phoneRegex.MatchString(input.Destination) {
 		return fmt.Errorf(
@@ -61,7 +58,6 @@ func (h *TwillioHandler) ValidateMessage(input entities.Message) error {
 		)
 	}
 
-	// Prevent sending to self (from == to)
 	if h.from != "" && input.Destination == h.from {
 		return errors.New("destination cannot be the same as the sender number")
 	}
@@ -72,7 +68,6 @@ func (h *TwillioHandler) ValidateMessage(input entities.Message) error {
 func (h *TwillioHandler) SendMessage(input entities.Message) (string, error) {
 	input.Type = "sms"
 
-	// Choose destination, allow override in development via TWILIO_VIRTUAL_NUMBER
 	dest := input.Destination
 	if h.env == "development" {
 		if v := os.Getenv("TWILIO_VIRTUAL_NUMBER"); strings.TrimSpace(v) != "" {
@@ -80,7 +75,6 @@ func (h *TwillioHandler) SendMessage(input entities.Message) (string, error) {
 		}
 	}
 
-	// Validate with effective destination
 	eff := input
 	eff.Destination = dest
 	if err := h.ValidateMessage(eff); err != nil {
