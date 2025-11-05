@@ -21,8 +21,9 @@ func NewServer() *Server {
 
 func (s *Server) Start(database db.Database, port string) error {
 
-	s.app.RedirectFixedPath = true
-	s.app.RedirectTrailingSlash = true
+	// Disable automatic redirects to avoid 307 responses
+	s.app.RedirectFixedPath = false
+	s.app.RedirectTrailingSlash = false
 	s.app.HandleMethodNotAllowed = true
 
 	s.app.Static("/examples", "./examples")

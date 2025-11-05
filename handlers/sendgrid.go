@@ -23,40 +23,20 @@ func NewSendGridHandler() (*SendGridHandler, error) {
 	if apiKey == "" {
 		return nil, errors.New("SENDGRID_API_KEY is required")
 	}
+
 	fromName := os.Getenv("SENDGRID_FROM_NAME")
-	if fromName == "" {
-		fromName = "Default Sender" // fallback
-	}
 	fromEmail := os.Getenv("SENDGRID_FROM_EMAIL")
 	if fromEmail == "" {
 		return nil, errors.New("SENDGRID_FROM_EMAIL is required")
 	}
 
 	client := sendgrid.NewSendClient(apiKey)
+
 	return &SendGridHandler{
 		client:    client,
 		fromName:  fromName,
 		fromEmail: fromEmail,
 	}, nil
-}
-
-func (h *SendGridHandler) ValidateMessage(input entities.Message) error {
-	if input.Type != "email" {
-		return errors.New("message type must be 'email' for SendGrid handler")
-	}
-	if input.Destination == "" {
-		return errors.New("destination (email) is required")
-	}
-	if !strings.Contains(input.Destination, "@") {
-		return errors.New("invalid email format for destination")
-	}
-	if input.Subject == "" {
-		return errors.New("subject is required for email messages")
-	}
-	if input.Content == "" {
-		return errors.New("content is required")
-	}
-	return nil
 }
 
 func (h *SendGridHandler) SendMessage(input entities.Message) (string, error) {
@@ -67,15 +47,11 @@ func (h *SendGridHandler) SendMessage(input entities.Message) (string, error) {
 	}
 
 	from := mail.NewEmail(h.fromName, h.fromEmail)
-	to := mail.NewEmail("", input.Destination) // recipient name is optional
+	to := mail.NewEmail("", input.Destination)
+	message := mail.NewSingleEmail(from, "Message from API", to, input.Content, input.Content)
 
-	message := mail.NewSingleEmail(
-		from,
-		input.Subject,
-		to,
-		input.Content,
-		input.Content,
-	)
+	// Set unique message ID for tracking
+	message.SetHeader("X-Message-ID", fmt.Sprintf("msg_%s", strings.Replace(input.ID, "-", "", -1)))
 
 	response, err := h.client.Send(message)
 	if err != nil {
@@ -86,5 +62,27 @@ func (h *SendGridHandler) SendMessage(input entities.Message) (string, error) {
 		return "", fmt.Errorf("sendgrid error: status=%d body=%s", response.StatusCode, response.Body)
 	}
 
-	return response.Headers["X-Message-Id"][0], nil
+	// Extract message ID from headers
+	msgID := response.Headers["X-Message-Id"]
+	if len(msgID) == 0 {
+		return "", errors.New("no message ID in response")
+	}
+
+	return msgID[0], nil
+}
+
+func (h *SendGridHandler) ValidateMessage(input entities.Message) error {
+	if input.Destination == "" {
+		return errors.New("destination (email) is required")
+	}
+
+	if !strings.Contains(input.Destination, "@") {
+		return errors.New("invalid email format")
+	}
+
+	if input.Content == "" {
+		return errors.New("content is required")
+	}
+
+	return nil
 }

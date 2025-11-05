@@ -144,9 +144,8 @@ Create request example:
 ```bash
 curl -sS -X POST http://localhost:8080/api/v1/plans/ \
   -H 'Content-Type: application/json' \
-  -d '{"name":"Free","price_cents":0}'
+  -d '{"name":"Pro","price_cents":1000}'
 ```
-
 ### User Plans
 - POST `/user-plans/`
 - GET `/user-plans/`
@@ -173,7 +172,7 @@ Create request example:
 ```bash
 curl -sS -X POST http://localhost:8080/api/v1/integrations/ \
   -H 'Content-Type: application/json' \
-  -d '{"name":"Ntfy","type":"sms", "plan_id":"de089777-f162-463a-b1c6-2a246c81ddc2"}'
+  -d '{"name":"Sendgrid","type":"email", "plan_id":"e69a281f-30b7-4a44-8c4b-6b3b29d60594"}'
 ```
 
 ### Messages
