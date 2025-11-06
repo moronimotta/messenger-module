@@ -1,253 +1,56 @@
-# Messenger Module API
+# Overview
 
-A lightweight Go + Gin service exposing CRUD endpoints for users, plans, user plans, integrations, messages, and message statuses. Uses PostgreSQL via GORM.
+As a software engineer focused on expanding my expertise in modern communication systems, I developed a comprehensive Messaging API that enables businesses to manage customer communications effectively through multiple channels.
 
-- Base URL: `http://localhost:8080`
-- API prefix: `/api/v1`
-- Static examples (simple HTML UI): `http://localhost:8080/examples/`
+## Project Description
 
-Note: When a user is created, they are automatically assigned to the Free plan. If the Free plan does not exist, it will be created (price_cents = 0).
+The Messaging API is a robust platform that allows users to select subscription plans and define their preferred communication methods with customers, whether through email or SMS. The system integrates with industry-leading services including Twilio (for SMS), SendGrid (for email), and Ntfy (for notifications) to handle message delivery. A key feature is its comprehensive logging system that tracks every message with detailed status updates (open, read, delivered, sent, error, etc.).
 
-## Plan Access Control
+The main purpose of developing this software was to create a unified communication platform that:
+1. Simplifies multi-channel customer communication
+2. Provides reliable message delivery tracking
+3. Offers flexible integration options
+4. Maintains detailed message status history
+5. Supports scalable subscription-based access
 
-The system implements a hierarchical plan access system:
+[Software Demo Video](https://youtu.be/cOuzPUX_40o)
 
-- **Free Plan**: Users can only access integrations that require the Free plan (typically Ntfy notifications)
-- **Pro Plan**: Users can access integrations that require either Free or Pro plans (Ntfy, SendGrid, Twilio)
+# Development Environment
 
-When sending a message, the system validates:
-1. User has an active plan
-2. User's plan level allows access to the integration's required plan
-3. Integration type is permitted by the plan (Free plan only allows Ntfy)
+## Tools Used
+- **Go**: Primary programming language
+- **Docker**: Container management for local PostgreSQL database
+- **Git**: Version control system
+- **Ngrok**: Secure tunnel for webhook testing
+- **API Integrations**:
+  - Twilio: SMS messaging
+  - SendGrid: Email delivery
+  - Ntfy: Push notifications
 
-## Quick start
+The API is built using Go with a carefully structured architecture:
 
-1) Start PostgreSQL using Docker Compose
+- **Web Framework**: Gin for handling HTTP requests
+- **Database**: PostgreSQL with GORM ORM for data persistence
+- **Architecture**: Clean architecture pattern with:
+  - Entities: Core business objects
+  - Repositories: Data access layer
+  - Use Cases: Business logic
+  - Handlers: Request processing
+  - Factories: Integration management
 
-```bash
-docker compose up -d
-# Postgres will listen on localhost:5432 with default creds from docker-compose.yml
-```
+This architecture ensures clean separation of concerns and makes the system extensible for future integrations.
 
-2) Create a `.env` file (optional, but recommended)
+# Useful Websites
 
-The app loads environment variables using `confs.LoadConfig()`; set either a full `DB_URL` or individual DB params. Example `.env`:
+- [Twilio Documentation](https://www.twilio.com/docs) - Comprehensive guides for SMS integration
+- [SendGrid API Reference](https://sendgrid.com/en-us) - Email delivery and webhook documentation
+- [Ngrok Documentation](https://ngrok.com/) - Webhook testing and tunnel setup
+- [Ntfy Documentation](https://ntfy.sh/) - Push notification implementation
+- [Go Gin Framework](https://gin-gonic.com/) - Web framework documentation
+- [GORM Documentation](https://gorm.io/) - Database operations and modeling
 
-```
-# Either use full URL:
-# DB_URL=postgres://myuser:mysecretpassword@localhost:5432/mydatabase?sslmode=disable
+# Future Work
 
-# Or use key=value style by setting these:
-DB_HOST=localhost
-DB_PORT=5432
-DB_USER=myuser
-DB_PASSWORD=mysecretpassword
-DB_NAME=mydatabase
-DB_SSLMODE=disable
-
-# App port (optional; defaults to 8080)
-PORT=8080
-```
-
-3) Run the API
-
-```bash
-go run ./main.go
-```
-
-Open: http://localhost:8080/examples/ to use the sample UI for:
-- Creating a user (auto-assigned Free plan)
-- Viewing available plans and "Buy Now" (creates UserPlan and marks it active with a dummy external id)
-- Creating Integrations with a provider Name and Type (email, phone, ntfy)
-
-## Data models (JSON)
-
-- User
-  - id, created_at, updated_at, deleted_at?
-  - name (required on create)
-  - api_key (auto-generated on create)
-  - active (default true)
-
-- Plan
-  - id, created_at, updated_at, deleted_at?
-  - name (required, unique)
-  - price_cents (required, must be >= 0; 0 means Free)
-  - external_id?
-
-- UserPlan
-  - id, created_at, updated_at, deleted_at?
-  - user_id (required)
-  - plan_id (required)
-  - active (default true)
-
-- Integration
-  - id, created_at, updated_at, deleted_at?
-  - name (required)
-  - api_key (required)
-  - Note: `plan_id` exists in the domain model but is not persisted in DB yet; currently unused.
-
-- Message
-  - id, created_at, updated_at, deleted_at?
-  - user_id (required)
-  - integration_id (required)
-  - type (auto-set by handler; e.g., "email", "sms", "ntfy")
-  - subject?
-  - content (required)
-  - destination (required)
-  - external_id?
-
-- MessageStatus
-  - id, created_at, updated_at, deleted_at?
-  - message_id (required)
-  - status (required; e.g., "sent", "delivered", "read")
-  - gateway_response?
-  - date_sent?, date_opened?, date_error?, date_canceled?, date_deferred? (RFC3339 strings)
-
-## Endpoints
-
-All endpoints are under `/api/v1`. Collections end with a trailing slash; item endpoints are `/.../:id`.
-
-### Users
-- POST `/users/`
-- GET `/users/`
-- GET `/users/:id`
-- PUT `/users/:id`
-- DELETE `/users/:id`
-
-Create request example:
-```bash
-curl -sS -X POST http://localhost:8080/api/v1/users/ \
-  -H 'Content-Type: application/json' \
-  -d '{"name":"Moroni Motta", "email":"moroni.art.motta@gmail.com"}'
-```
-Response example (201):
-```json
-{
-  "id": "...",
-  "created_at": "2025-11-03T12:34:56Z",
-  "updated_at": "2025-11-03T12:34:56Z",
-  "name": "Jane Dev",
-  "api_key": "<auto-generated>",
-  "active": true
-}
-```
-Note: On success, the service ensures a Free plan exists (price 0) and creates a `UserPlan` for the new user.
-
-### Plans
-- POST `/plans/`
-- GET `/plans/`
-- GET `/plans/:id`
-- PUT `/plans/:id`
-- DELETE `/plans/:id`
-
-Create request example:
-```bash
-curl -sS -X POST http://localhost:8080/api/v1/plans/ \
-  -H 'Content-Type: application/json' \
-  -d '{"name":"Pro","price_cents":1000}'
-```
-### User Plans
-- POST `/user-plans/`
-- GET `/user-plans/`
-- GET `/user-plans/:id`
-- PUT `/user-plans/:id`
-- DELETE `/user-plans/:id`
-
-Create request example:
-```bash
-curl -sS -X POST http://localhost:8080/api/v1/user-plans/ \
-  -H 'Content-Type: application/json' \
-  -d '{"user_id":"ea6ec218-e78a-438c-be63-9f8a27eedb66","plan_id":"de089777-f162-463a-b1c6-2a246c81ddc2","active":true}'
-```
-
-
-### Integrations
-- POST `/integrations/`
-- GET `/integrations/`
-- GET `/integrations/:id`
-- PUT `/integrations/:id`
-- DELETE `/integrations/:id`
-
-Create request example:
-```bash
-curl -sS -X POST http://localhost:8080/api/v1/integrations/ \
-  -H 'Content-Type: application/json' \
-  -d '{"name":"Sendgrid","type":"email", "plan_id":"e69a281f-30b7-4a44-8c4b-6b3b29d60594"}'
-```
-
-### Messages
-- POST `/messages/`
-- GET `/messages/`
-- GET `/messages/:id`
-- PUT `/messages/:id`
-- DELETE `/messages/:id`
-
-Create request example:
-```bash
-curl -sS -X POST http://localhost:8080/api/v1/messages/ \
-  -H 'Content-Type: application/json' \
-  -d '{
-    "user_id": "<user-id>",
-    "integration_id": "<integration-id>",
-    "content": "Hello there",
-    "destination": "+15551234"
-  }'
-```
-Note: The `type` field is automatically set based on the integration handler (email/sms/ntfy).
-
-### Message Statuses
-- POST `/message-statuses/`
-- GET `/message-statuses/`
-- GET `/message-statuses/:id`
-- PUT `/message-statuses/:id`
-- DELETE `/message-statuses/:id`
-
-Create request example:
-```bash
-curl -sS -X POST http://localhost:8080/api/v1/message-statuses/ \
-  -H 'Content-Type: application/json' \
-  -d '{"message_id":"<message-id>","status":"sent"}'
-```
-
-### Webhooks
-
-Two endpoints accept delivery status webhooks and create MessageStatus entries using the message external id:
-
-- POST `/webhooks/sendgrid`
-- POST `/webhooks/twilio` (also accepts `application/x-www-form-urlencoded` with MessageSid/MessageStatus)
-
-Generic JSON body:
-```json
-{
-  "external_id": "<gateway-message-id>",
-  "status": "delivered",
-  "gateway_response": "raw payload or reason",
-  "timestamp": 1730678400
-}
-```
-
-## Example UI
-
-Open `http://localhost:8080/examples/`:
-- Create User: posts to `/api/v1/users/` and then redirects to `account.html`
-- Account:
-  - Plans: lists from `/api/v1/plans/` and lets you "Buy Now" (creates `/api/v1/user-plans/` active=true)
-  - Integrations: create by name (SendGrid/Twilio/Ntfy) and type (email/phone/ntfy)
-
-## Status codes
-- 201 Created: successful POST
-- 200 OK: successful GET/PUT
-- 204 No Content: successful DELETE
-- 400 Bad Request: validation or binding error
-- 404 Not Found: entity not found
-- 500 Internal Server Error: database or server error
-
-## Auth
-There is no authentication enforced yet. `api_key` is currently just a field on the `User` object. Future iterations may introduce auth and per-user filtering (e.g., list messages by user, etc.).
-
-## Notes and limitations
-- The Free plan is allowed to have `price_cents = 0`; other plans must have `price_cents >= 0`.
-- The domain model for `Integration` contains `plan_id`, but the current DB model does not; this field is not persisted or used yet.
-- Collections currently return all items; per-user scoping and pagination are not implemented yet.
-- Plan access validation: Pro users can access both Free and Pro plan features, while Free users can only access Free plan features.
-- Message sending validates that the user has an active plan that allows access to the integration's required plan level.
+- **Bulk Messaging**: Support for sending messages to multiple recipients
+- **Message Scheduling**: Add capability to schedule messages for future delivery
+- **Webhook Retries**: Implement retry mechanism for failed webhook deliveries
